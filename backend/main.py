@@ -2,8 +2,8 @@ from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
-import backend.database as database
-import backend.ai_service as ai_service
+import database as database
+import ai_service as ai_service
 
 app = FastAPI(title="SpendWise AI API")
 

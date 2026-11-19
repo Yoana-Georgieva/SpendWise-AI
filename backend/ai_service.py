@@ -10,7 +10,7 @@ API_KEY = os.getenv("GEMINI_API_KEY")
 client = genai.Client(api_key=API_KEY)
 
 # Списък с модели по ред на приоритет (ако първият е претоварен, пробва втория)
-MODELS_TO_TRY = ["gemini-3.8-flash", "gemini-3.8-flash-lite", "gemini-2.5-flash-lite"]
+MODELS_TO_TRY = ["gemini-3.5-flash", "gemini-3.5-flash-lite"]
 
 CATEGORIES = [
     "Храна и супермаркет",
