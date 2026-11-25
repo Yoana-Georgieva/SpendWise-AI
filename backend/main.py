@@ -6,6 +6,7 @@ import database as database
 import ai_service as ai_service
 
 app = FastAPI(title="SpendWise AI API")
+MAX_FILE_SIZE = 5 * 1024 * 1024  # 5 MB
 
 # Позволяваме на Frontend-а на колежката ти да се свързва с Backend-а (CORS)
 app.add_middleware(
@@ -60,11 +61,40 @@ def create_expense(expense: ExpenseCreate):
 
 @app.post("/scan-receipt")
 async def scan_receipt(file: UploadFile = File(...)):
-    """Приема снимка на касова бележка, извлича данните с AI/OCR и записва разхода."""
+    """Приема снимка на касова бележка, валидира я, извлича данните с AI/OCR и записва разхода."""
+    # 1. Проверка на типа на файла
+    if not file.content_type or not file.content_type.startswith("image/"):
+        raise HTTPException(
+            status_code=400,
+            detail="Неподдържан формат. Качи изображение (JPG, PNG, WEBP)."
+        )
+
+    # 2. Еднократно четене на файла и проверка за празен / твърде голям файл
+    contents = await file.read()
+    if not contents:
+        raise HTTPException(
+            status_code=400,
+            detail="Каченият файл е празен."
+        )
+
+    if len(contents) > MAX_FILE_SIZE:
+        raise HTTPException(
+            status_code=413,
+            detail="Файлът е твърде голям. Максималният позволен размер е 5 MB."
+        )
+
+    # 3. AI/OCR анализ с ясни HTTP грешки
     try:
-        image_bytes = await file.read()
-        receipt_data = ai_service.analyze_receipt(image_bytes)
-        
+        receipt_data = ai_service.analyze_receipt(contents)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Неочаквана грешка при сканиране: {str(e)}")
+
+    # 4. Безопасен запис в базата с резервни стойности по подразбиране
+    try:
         new_id = database.add_expense(
             title=receipt_data.get("title", "Неизвестен магазин"),
             amount=float(receipt_data.get("amount", 0.0)),
@@ -78,7 +108,7 @@ async def scan_receipt(file: UploadFile = File(...)):
             "extracted_data": receipt_data
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Грешка при сканиране: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Грешка при запис в базата: {str(e)}")
 
 @app.post("/budget")
 def update_budget(budget: BudgetCreate):
@@ -95,3 +125,10 @@ def read_budget_status(month: str):
         "budget": status,
         "categories": categories
     }
+
+@app.delete("/expenses/{expense_id}")
+def delete_expense(expense_id: int):
+    deleted = database.delete_expense(expense_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Expense not found")
+    return {"status": "deleted", "id": expense_id}

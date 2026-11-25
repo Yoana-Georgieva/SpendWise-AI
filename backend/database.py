@@ -47,6 +47,15 @@ def add_expense(title: str, amount: float, category: str, date: str, source: str
     conn.close()
     return new_id
 
+def delete_expense(expense_id: int) -> bool:
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM expenses WHERE id = ?", (expense_id,))
+    deleted_rows = cursor.rowcount
+    conn.commit()
+    conn.close()
+    return deleted_rows > 0
+
 def get_all_expenses():
     conn = get_db_connection()
     cursor = conn.cursor()
