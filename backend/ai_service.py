@@ -129,3 +129,65 @@ if __name__ == "__main__":
     test_title = "Бензиностанция ЕКО"
     result = categorize_expense(test_title)
     print(f"Разход: {test_title} | Категория: {result}")
+
+    
+INSIGHTS_CACHE = {}
+def generate_spending_insights(habits_data: dict) -> dict:
+    """Генерира AI анализ на навиците на харчене и 3 практични съвета на български."""
+    if habits_data["transaction_count"] == 0:
+        return {
+            "summary": f"Няма записани разходи за {habits_data['month']}.",
+            "top_habit": "Добави първите си разходи или сканирай бележка, за да получиш анализ.",
+            "tips": []
+        }
+
+    # Кеш по текущото състояние на данните (ако добавиш нов разход, хешът се променя автоматично)
+    data_str = json.dumps(habits_data, ensure_ascii=False, sort_keys=True)
+    cache_key = hashlib.sha256(data_str.encode("utf-8")).hexdigest()
+    if cache_key in INSIGHTS_CACHE:
+        print("[INSIGHTS] Върнато от кеша за 0.01 сек.")
+        return INSIGHTS_CACHE[cache_key]
+
+    prompt = (
+        "Ти си личен финансов асистент в приложението SpendWise AI. "
+        "Анализирай следните месечни данни за разходите на потребителя и върни САМО валиден JSON "
+        'с ключове: "summary" (кратко обобщение от 1-2 изречения на български), '
+        '"top_habit" (най-отчетливият навик на харчене в 1 изречение) и '
+        '"tips" (списък с точно 3 кратки, конкретни съвета за спестяване на български). '
+        f"Данни: {data_str}"
+    )
+
+    if API_KEY:
+        for model_name in MODELS_TO_TRY:
+            try:
+                response = client.models.generate_content(
+                    model=model_name,
+                    contents=prompt,
+                    config=types.GenerateContentConfig(
+                        response_mime_type="application/json",
+                        temperature=0.3,
+                    ),
+                )
+                result = json.loads(response.text)
+                INSIGHTS_CACHE[cache_key] = result
+                return result
+            except Exception as e:
+                print(f"[INSIGHTS] {model_name} не успя: {e}")
+                continue
+
+    # Резервен автоматичен анализ (ако AI услугата временно дава 503)
+    top_cat = habits_data["categories"][0]
+    status_text = (
+        f"Надвишил си месечния си бюджет с {abs(habits_data['remaining']):.2f} лв."
+        if habits_data["is_exceeded"]
+        else f"Общо си похарчил {habits_data['total_spent']:.2f} лв. в {habits_data['transaction_count']} покупки."
+    )
+    return {
+        "summary": status_text,
+        "top_habit": f"Най-голям дял има категория „{top_cat['category']}“ — {top_cat['percentage']}% ({top_cat['total']:.2f} лв.).",
+        "tips": [
+            f"Прегледай покупките си в „{top_cat['category']}“ — намаляване с 15% ще ти спести {top_cat['total'] * 0.15:.2f} лв.",
+            f"Средният ти разход на покупка е {habits_data['average_expense']:.2f} лв. Планирай по-големите покупки предварително.",
+            "Следи редовно оставащия бюджет, за да избегнеш импулсивни харчове в края на месеца."
+        ]
+    }

@@ -4,6 +4,7 @@ from pydantic import BaseModel
 from typing import Optional
 import database as database
 import ai_service as ai_service
+import re
 
 app = FastAPI(title="SpendWise AI API")
 MAX_FILE_SIZE = 5 * 1024 * 1024  # 5 MB
@@ -132,3 +133,45 @@ def delete_expense(expense_id: int):
     if not deleted:
         raise HTTPException(status_code=404, detail="Expense not found")
     return {"status": "deleted", "id": expense_id}
+
+@app.get("/analytics/periods")
+def get_analytics_by_period(group_by: str = "day", month: Optional[str] = None):
+    """Връща разпределение на разходите по дни, седмици или месеци."""
+    if group_by not in ("day", "week", "month"):
+        raise HTTPException(
+            status_code=400,
+            detail="Невалиден период. Използвай 'day', 'week' или 'month'."
+        )
+    if month and not re.match(r"^\d{4}-(0[1-9]|1[0-2])$", month):
+        raise HTTPException(
+            status_code=400,
+            detail="Невалиден формат за месец. Използвай ГГГГ-ММ (напр. 2026-11)."
+        )
+
+    periods = database.get_period_stats(group_by=group_by, month=month)
+    total_amount = round(sum(p["total"] for p in periods), 2)
+
+    return {
+        "group_by": group_by,
+        "month": month,
+        "total_amount": total_amount,
+        "periods": periods
+    }
+
+
+@app.get("/insights/{month}")
+def get_spending_insights(month: str):
+    """Връща статистики за навиците и AI съвети за конкретен месец."""
+    if not re.match(r"^\d{4}-(0[1-9]|1[0-2])$", month):
+        raise HTTPException(
+            status_code=400,
+            detail="Невалиден формат за месец. Използвай ГГГГ-ММ (напр. 2026-11)."
+        )
+
+    habits_data = database.get_month_habits_data(month)
+    ai_insights = ai_service.generate_spending_insights(habits_data)
+
+    return {
+        "stats": habits_data,
+        "ai_insights": ai_insights
+    }

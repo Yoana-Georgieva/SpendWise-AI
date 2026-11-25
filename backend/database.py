@@ -136,3 +136,104 @@ if __name__ == "__main__":
     print("--- Статистика по категории (за графиките) ---")
     print(get_category_stats("2026-11"))
 
+def get_period_stats(group_by: str = "day", month: str = None) -> list:
+    """Групира разходите по дни, седмици или месеци за графиките по периоди."""
+    conn = sqlite3.connect("spendwise.db")
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+
+    if group_by == "month":
+        period_expr = "substr(date, 1, 7)"
+    elif group_by == "week":
+        period_expr = "strftime('%Y-W%W', date)"
+    else:  # "day"
+        period_expr = "date"
+
+    if month and group_by != "month":
+        cursor.execute(
+            f"""
+            SELECT {period_expr} AS period,
+                   ROUND(SUM(amount), 2) AS total,
+                   COUNT(*) AS count
+            FROM expenses
+            WHERE date LIKE ?
+            GROUP BY period
+            ORDER BY period ASC
+            """,
+            (f"{month}-%",)
+        )
+    else:
+        cursor.execute(
+            f"""
+            SELECT {period_expr} AS period,
+                   ROUND(SUM(amount), 2) AS total,
+                   COUNT(*) AS count
+            FROM expenses
+            GROUP BY period
+            ORDER BY period ASC
+            """
+        )
+
+    rows = [dict(row) for row in cursor.fetchall()]
+    conn.close()
+    return rows
+
+
+def get_month_habits_data(month: str) -> dict:
+    """Събира обобщени статистики за навиците на харчене за конкретен месец."""
+    conn = sqlite3.connect("spendwise.db")
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+
+    # Всички разходи за месеца
+    cursor.execute(
+        """
+        SELECT title, amount, category, date
+        FROM expenses
+        WHERE date LIKE ?
+        ORDER BY amount DESC
+        """,
+        (f"{month}-%",)
+    )
+    expenses = [dict(row) for row in cursor.fetchall()]
+
+    # Месечен бюджет (ако има зададен)
+    cursor.execute("SELECT limit_amount FROM budgets WHERE month = ?", (month,))
+    budget_row = cursor.fetchone()
+    limit_amount = float(budget_row["limit_amount"]) if budget_row else 0.0
+
+    # Разбивка по категории
+    cursor.execute(
+        """
+        SELECT category, ROUND(SUM(amount), 2) AS total, COUNT(*) AS count
+        FROM expenses
+        WHERE date LIKE ?
+        GROUP BY category
+        ORDER BY total DESC
+        """,
+        (f"{month}-%",)
+    )
+    categories = [dict(row) for row in cursor.fetchall()]
+    conn.close()
+
+    total_spent = round(sum(e["amount"] for e in expenses), 2)
+    count = len(expenses)
+    avg_expense = round(total_spent / count, 2) if count > 0 else 0.0
+
+    # Добавяме процент към всяка категория
+    for cat in categories:
+        cat["percentage"] = round((cat["total"] / total_spent) * 100, 1) if total_spent > 0 else 0.0
+
+    top_expense = expenses[0] if expenses else None
+
+    return {
+        "month": month,
+        "limit_amount": limit_amount,
+        "total_spent": total_spent,
+        "remaining": round(limit_amount - total_spent, 2) if limit_amount > 0 else None,
+        "is_exceeded": (limit_amount > 0 and total_spent > limit_amount),
+        "transaction_count": count,
+        "average_expense": avg_expense,
+        "top_expense": top_expense,
+        "categories": categories,
+    }
