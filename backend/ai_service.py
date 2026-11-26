@@ -150,6 +150,7 @@ def generate_spending_insights(habits_data: dict) -> dict:
 
     prompt = (
         "Ти си личен финансов асистент в приложението SpendWise AI. "
+        "Всички суми са в евро (€) — използвай САМО евро (€), никога лева (лв.). "
         "Анализирай следните месечни данни за разходите на потребителя и върни САМО валиден JSON "
         'с ключове: "summary" (кратко обобщение от 1-2 изречения на български), '
         '"top_habit" (най-отчетливият навик на харчене в 1 изречение) и '
@@ -178,16 +179,16 @@ def generate_spending_insights(habits_data: dict) -> dict:
     # Резервен автоматичен анализ (ако AI услугата временно дава 503)
     top_cat = habits_data["categories"][0]
     status_text = (
-        f"Надвишил си месечния си бюджет с {abs(habits_data['remaining']):.2f} лв."
+        f"Надвишил си месечния си бюджет с {abs(habits_data['remaining']):.2f} €."
         if habits_data["is_exceeded"]
-        else f"Общо си похарчил {habits_data['total_spent']:.2f} лв. в {habits_data['transaction_count']} покупки."
+        else f"Общо си похарчил {habits_data['total_spent']:.2f} € в {habits_data['transaction_count']} покупки."
     )
     return {
         "summary": status_text,
-        "top_habit": f"Най-голям дял има категория „{top_cat['category']}“ — {top_cat['percentage']}% ({top_cat['total']:.2f} лв.).",
+        "top_habit": f"Най-голям дял има категория „{top_cat['category']}“ — {top_cat['percentage']}% ({top_cat['total']:.2f} €).",
         "tips": [
-            f"Прегледай покупките си в „{top_cat['category']}“ — намаляване с 15% ще ти спести {top_cat['total'] * 0.15:.2f} лв.",
-            f"Средният ти разход на покупка е {habits_data['average_expense']:.2f} лв. Планирай по-големите покупки предварително.",
+            f"Прегледай покупките си в „{top_cat['category']}“ — намаляване с 15% ще ти спести {top_cat['total'] * 0.15:.2f} €.",
+            f"Средният ти разход на покупка е {habits_data['average_expense']:.2f} €. Планирай по-големите покупки предварително.",
             "Следи редовно оставащия бюджет, за да избегнеш импулсивни харчове в края на месеца."
         ]
     }
