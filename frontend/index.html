@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SpendWise AI — Умният ти бюджет</title>
+  <meta name="description" content="SpendWise AI: следи разходите си, сканирай касови бележки с AI и управлявай месечния си бюджет." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <div class="bg-orbs" aria-hidden="true">
+    <span class="orb orb-1"></span><span class="orb orb-2"></span><span class="orb orb-3"></span>
+  </div>
+
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo">S<span>W</span></div>
+      <div>
+        <h1>SpendWise <span class="grad">AI</span></h1>
+        <p class="subtitle">Умният ти личен бюджет</p>
+      </div>
+    </div>
+    <div class="topbar-actions">
+      <label class="month-picker" for="month-input">
+        <span>Месец</span>
+        <input type="month" id="month-input" />
+      </label>
+      <span id="server-status" class="status-pill" title="Статус на сървъра">● Свързване…</span>
+    </div>
+  </header>
+
+  <main class="container">
+    <!-- BUDGET -->
+    <section class="card budget-card" id="budget-section">
+      <div class="card-head">
+        <h2>Месечен бюджет</h2>
+        <form id="budget-form" class="inline-form">
+          <input type="number" id="budget-input" min="0" step="0.01" placeholder="Лимит (лв.)" required />
+          <button type="submit" class="btn btn-primary" id="budget-save-btn">Запази</button>
+        </form>
+      </div>
+
+      <div id="budget-alert" class="alert hidden">⚠️ Бюджетът е надвишен! Внимавай с харченето.</div>
+
+      <div class="budget-stats">
+        <div class="stat"><span class="stat-label">Лимит</span><span class="stat-value" id="stat-limit">0.00 лв.</span></div>
+        <div class="stat"><span class="stat-label">Похарчено</span><span class="stat-value" id="stat-spent">0.00 лв.</span></div>
+        <div class="stat"><span class="stat-label">Остава</span><span class="stat-value" id="stat-remaining">0.00 лв.</span></div>
+      </div>
+      <div class="progress"><div class="progress-bar" id="budget-progress"></div></div>
+      <p class="progress-label" id="progress-label">Задай бюджет, за да следиш прогреса.</p>
+    </section>
+
+    <div class="grid-2">
+      <!-- MANUAL EXPENSE -->
+      <section class="card" id="add-section">
+        <h2>➕ Нов разход</h2>
+        <form id="expense-form" class="stack-form">
+          <label>Описание
+            <input type="text" id="exp-title" placeholder="напр. Аптека Софарма" required />
+          </label>
+          <div class="row">
+            <label>Сума (лв.)
+              <input type="number" id="exp-amount" min="0.01" step="0.01" placeholder="0.00" required />
+            </label>
+            <label>Дата
+              <input type="date" id="exp-date" required />
+            </label>
+          </div>
+          <label>Категория
+            <select id="exp-category">
+              <option value="">✨ Автоматично (AI)</option>
+            </select>
+          </label>
+          <button type="submit" class="btn btn-primary" id="expense-submit-btn">Добави разход</button>
+        </form>
+      </section>
+
+      <!-- RECEIPT SCAN -->
+      <section class="card" id="scan-section">
+        <h2>📷 Сканирай бележка</h2>
+        <label class="dropzone" id="dropzone" for="receipt-input">
+          <input type="file" id="receipt-input" accept="image/*" capture="environment" hidden />
+          <img id="receipt-preview" class="hidden" alt="Преглед на бележката" />
+          <div id="dropzone-text">
+            <div class="dz-icon">🧾</div>
+            <p><strong>Снимай</strong> или <strong>пусни</strong> снимка тук</p>
+            <small>JPG, PNG, WEBP · до 5 MB</small>
+          </div>
+        </label>
+        <button class="btn btn-accent" id="scan-btn" disabled>Разчети с AI</button>
+        <div id="scan-result" class="scan-result hidden"></div>
+      </section>
+    </div>
+
+    <div class="grid-2">
+      <section class="card" id="chart-section">
+        <h2>Разходи по категории</h2>
+        <div class="chart-wrap"><canvas id="category-chart"></canvas></div>
+        <p class="empty hidden" id="chart-empty">Няма разходи за този месец.</p>
+      </section>
+
+      <section class="card" id="period-section">
+        <div class="card-head">
+          <h2>Разходи по дни</h2>
+          <div class="seg" id="period-toggle">
+            <button data-group="day" class="active">Дни</button>
+            <button data-group="week">Седмици</button>
+          </div>
+        </div>
+        <div class="chart-wrap"><canvas id="period-chart"></canvas></div>
+      </section>
+    </div>
+
+    <!-- AI INSIGHTS -->
+    <section class="card insights-card" id="insights-section">
+      <div class="card-head">
+        <h2>🤖 AI съвети</h2>
+        <button class="btn btn-ghost" id="insights-btn">Анализирай месеца</button>
+      </div>
+      <div id="insights-body" class="insights-body">
+        <p class="muted">Натисни „Анализирай месеца“, за да получиш персонални съвети.</p>
+      </div>
+    </section>
+
+    <!-- EXPENSE LIST -->
+    <section class="card" id="list-section">
+      <div class="card-head">
+        <h2>Всички разходи</h2>
+        <input type="search" id="search-input" placeholder="Търси…" />
+      </div>
+      <ul id="expense-list" class="expense-list"></ul>
+      <p class="empty hidden" id="list-empty">Все още няма разходи. Добави първия! 🚀</p>
+    </section>
+  </main>
+
+  <div id="toast" class="toast"></div>
+</body>
+</html>
